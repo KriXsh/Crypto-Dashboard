@@ -34,10 +34,11 @@ const useWebSocket = (exchange: string, market: "spot" | "futures") => {
     });
 
     socket.on("spot_trade_update", (trade: TradeData) => {
-      if (trade.exchange === exchange && trade.market === market) {
-        console.log("Incoming Trade Data:", trade); // ✅ Check if trade is coming
+      // console.log("Incoming Trade Data/......:", trade);
+      // if (trade.exchange === exchange && trade.market === market) {
+        // console.log("Incoming Trade Data:", trade); // ✅ Check if trade is coming
         setTradeData(trade); // Store only the latest trade
-      }
+      // }
     });
 
     return () => {

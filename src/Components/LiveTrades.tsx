@@ -44,7 +44,6 @@ const LiveTrades: React.FC<LiveTradesProps> = ({ exchange, market }) => {
       const apiBase = process.env.NEXT_PUBLIC_API_URL;
       const endpoint = `${apiBase}/${exchange.toLowerCase()}/${market}OHLCV?symbol=BTCUSDT&interval=1m&limit=100&page=1&pageSize=10&fromDate=${fromDate}&toDate=${toDate}`;
 
-      // Fetch OHLCV Data
       const response = await axios.get(endpoint);
       const fetchedData = response.data.data;
 
@@ -54,7 +53,6 @@ const LiveTrades: React.FC<LiveTradesProps> = ({ exchange, market }) => {
         return;
       }
 
-      // Format Data
       const formattedData = fetchedData.map((entry: OHLCVData) => ({
         ...entry,
         date: new Date(entry.createdAt),
@@ -71,15 +69,15 @@ const LiveTrades: React.FC<LiveTradesProps> = ({ exchange, market }) => {
     }
   };
 
-  // 🟢 **Handle Live Trade Updates from WebSocket Every 10s**
+  // **Handle Live Trade Updates from WebSocket (Every 3 Sec)**
   useEffect(() => {
-    if (!tradeData) return; // No data? Exit
-  
-    console.log("Live Trade Data:", tradeData); // ✅ Debugging incoming trade data
-  
+    if (!tradeData || ohlcvData.length === 0) return; // Exit if no data
+
+    console.log("Live Trade Data:", tradeData);
+
     const tradeTimestamp = new Date(tradeData.createdAt || new Date());
-    const tradeMinute = new Date(tradeTimestamp.setSeconds(0, 0)); // Normalize time to minutes
-  
+    const tradeMinute = new Date(tradeTimestamp.setSeconds(0, 0));
+
     const newTradeData: OHLCVData = {
       createdAt: tradeMinute.toISOString(),
       open: Number(tradeData.price),
@@ -87,53 +85,51 @@ const LiveTrades: React.FC<LiveTradesProps> = ({ exchange, market }) => {
       low: Number(tradeData.price),
       close: Number(tradeData.price),
       volume: Number(tradeData.volume),
-      date: tradeMinute, // Important for the chart
+      date: tradeMinute,
     };
-  
+
     setOhlcvData((prevData) => {
       let updatedData = [...prevData];
-  
+
       if (updatedData.length > 0) {
         const lastCandle = updatedData[updatedData.length - 1];
-  
+
         if (lastCandle.createdAt === newTradeData.createdAt) {
-          // ✅ **Update the latest candle (if same minute)**
+          // Update the existing candle
           lastCandle.high = Math.max(lastCandle.high, newTradeData.high);
           lastCandle.low = Math.min(lastCandle.low, newTradeData.low);
           lastCandle.close = newTradeData.close;
           lastCandle.volume += newTradeData.volume;
         } else {
-          // ✅ **Push new data & remove the oldest entry (FIFO behavior)**
+          // Add new candle & remove oldest (Queue FIFO)
           updatedData.push(newTradeData);
           if (updatedData.length > 100) {
-            updatedData.shift(); // Remove oldest entry (FIFO queue)
+            updatedData.shift();
           }
         }
       } else {
-        updatedData = [newTradeData]; // If empty, initialize data
+        updatedData = [newTradeData]; // Initialize if empty
       }
-  
-      console.log("Updated Candlestick Data:", updatedData); // ✅ Debugging
+
+      console.log("Updated Candlestick Data:", updatedData);
       return updatedData;
     });
-  }, [tradeData]); // ✅ Trigger update when new trade data comes in
-  
-  // 🟢 **Ensure Graph Updates Every 10 Seconds**
+  }, [tradeData]);
+
+  // **Ensure Graph Updates Every 3 Seconds**
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log("Triggering Chart Refresh"); // ✅ Debugging
-      setOhlcvData((prevData) => [...prevData]); // Force re-render (React Optimization)
-    }, 1000); // Every 10 seconds
-  
+      setOhlcvData((prevData) => [...prevData]); // Force re-render
+    }, 3000); // Every 3 sec
+
     return () => clearInterval(interval); // Cleanup on unmount
   }, []);
-  
 
-  // 🛠 **Fix X Scale Provider for Zooming**
+  // **Fix X Scale Provider for Zooming**
   const xScaleProvider = discontinuousTimeScaleProvider.inputDateAccessor((d) => d.date);
   const { data, xScale, xAccessor, displayXAccessor } = xScaleProvider(ohlcvData);
 
-  console.log("Updated Chart Data:", data); // ✅ Debugging to check if chart data updates
+  console.log("Updated Chart Data:", data);
 
   return (
     <Paper elevation={3} sx={{ padding: "12px", background: "#1E1E1E", color: "white", borderRadius: "12px", textAlign: "center" }}>
@@ -142,10 +138,9 @@ const LiveTrades: React.FC<LiveTradesProps> = ({ exchange, market }) => {
       </Typography>
 
       <Box sx={{ marginTop: "12px" }}>
-        <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={{ marginRight: "10px", padding: "8px", borderRadius: "6px" }} />
-        <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={{ marginRight: "10px", padding: "8px", borderRadius: "6px" }} />
-
-        <Button variant="contained" sx={{ backgroundColor: "#6200ea", color: "white", fontWeight: "bold", textTransform: "none", padding: "10px 20px", borderRadius: "8px" }} onClick={fetchOHLCVData} disabled={loading}>
+        <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+        <Button variant="contained" onClick={fetchOHLCVData} disabled={loading}>
           {loading ? "Loading..." : "Visualize Data"}
         </Button>
       </Box>
